@@ -1,3 +1,8 @@
+_G.CONFIG = {
+    AutoFishingOnStart = true,
+    AutoGrapeOnStart = false
+}
+
 --========================================================
 --           CHECK REMOTES & AUTO SERVER HOP             
 --========================================================
@@ -21,7 +26,6 @@ end
 while not checkRemotes() do
     print("⚠️ Remotes ไม่พบ - กำลังเข้าเซิร์ฟเวอร์ใหม่...")
     
-    -- คลิกปุ่ม Beady City
     pcall(function()
         local VirtualInputManager = game:GetService("VirtualInputManager")
         local UserInputService = game:GetService("UserInputService")
@@ -38,6 +42,10 @@ while not checkRemotes() do
             VirtualInputManager:SendTouchEvent(0, centerX, centerY)
             task.wait(0.1)
             VirtualInputManager:SendTouchEvent(2, centerX, centerY)
+
+            VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+            task.wait(0.1)
+            VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
         else
             VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
             task.wait(0.1)
@@ -47,7 +55,6 @@ while not checkRemotes() do
     
     task.wait(2)
     
-    -- ค้นหาเซิฟเวอร์ว่าง (0 คน) จนกว่าจะเจอ
     pcall(function()
         local Players = game:GetService("Players")
         local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -57,31 +64,11 @@ while not checkRemotes() do
 
         local scrollingFrame = LocalPlayer.PlayerGui:WaitForChild("ScreenGui").CanvasGroup.ServerList.ScrollingFrame
 
-        -- ฟังก์ชัน Scroll ที่รองรับทั้ง PC และมือถือ
-        local function scrollToPosition(yPosition)
-            if isMobile then
-                -- มือถือ: ใช้ Touch Swipe
-                local startY = scrollingFrame.AbsolutePosition.Y + 100
-                local endY = startY - 200  -- Swipe ขึ้น
-                
-                VirtualInputManager:SendTouchEvent(0, scrollingFrame.AbsolutePosition.X + 100, startY)
-                task.wait(0.05)
-                VirtualInputManager:SendTouchEvent(1, scrollingFrame.AbsolutePosition.X + 100, endY)
-                task.wait(0.05)
-                VirtualInputManager:SendTouchEvent(2, scrollingFrame.AbsolutePosition.X + 100, endY)
-            else
-                -- PC: ใช้ CanvasPosition
-                scrollingFrame.CanvasPosition = Vector2.new(0, yPosition)
-            end
-            task.wait(0.3)
-        end
-
         local function virtualClick(button)
             if not button then return end
 
-            -- Scroll ไปที่ปุ่ม
-            local buttonY = button.AbsolutePosition.Y - scrollingFrame.AbsolutePosition.Y
-            scrollToPosition(buttonY)
+            scrollingFrame.CanvasPosition = Vector2.new(0, button.AbsolutePosition.Y - scrollingFrame.AbsolutePosition.Y)
+            task.wait(0.3)
 
             local pos = button.AbsolutePosition
             local size = button.AbsoluteSize
@@ -99,70 +86,23 @@ while not checkRemotes() do
             end
         end
 
-        local maxAttempts = 50  -- ค้นหาสูงสุด 50 ครั้ง
-        local attemptCount = 0
         local found = false
-        
-        print("🔍 กำลังค้นหาเซิฟเวอร์ว่าง (0 คน)...")
-        
-        while not found and attemptCount < maxAttempts do
-            attemptCount = attemptCount + 1
-            print("🔄 ครั้งที่ " .. attemptCount .. " / " .. maxAttempts)
+        for _, v in pairs(scrollingFrame:GetDescendants()) do
+            local success, text = pcall(function() return v.ContentText end)
             
-            -- Scroll ไปที่ตำแหน่งต่างๆ เพื่อโหลดปุ่มทั้งหมด
-            local scrollPositions = {0, 500, 1000, 1500, 2000, 2500, 3000}
-            
-            for _, yPos in ipairs(scrollPositions) do
-                scrollToPosition(yPos)
-                task.wait(0.5)  -- รอให้โหลดปุ่ม
+            if success and v.Name == "Count" and text == "50 / 0" then
+                local container = v.Parent
+                local targetButton = container:FindFirstChildOfClass("TextButton") or container.Parent:FindFirstChildOfClass("TextButton")
                 
-                -- ค้นหาเซิฟเวอร์ว่าง
-                for _, v in pairs(scrollingFrame:GetDescendants()) do
-                    local success, text = pcall(function() return v.ContentText end)
-                    
-                    -- เปลี่ยนจาก "50 / 0" เป็นหาที่มี "/ 0" (เซิฟเวอร์ว่าง)
-                    if success and v.Name == "Count" and string.match(text, "/ 0$") then
-                        local container = v.Parent
-                        local targetButton = container:FindFirstChildOfClass("TextButton") or container.Parent:FindFirstChildOfClass("TextButton")
-                        
-                        if targetButton then
-                            print("✅ เจอเซิฟเวอร์ว่าง: " .. text)
-                            virtualClick(targetButton)
-                            found = true
-                            break
-                        end
-                    end
+                if targetButton then
+                    virtualClick(targetButton)
+                    found = true
+                    break
                 end
-                
-                if found then break end
-            end
-            
-            if not found then
-                print("⏳ ไม่เจอเซิฟเวอร์ว่าง กำลังรีเฟรชรายการ...")
-                
-                -- Refresh โดยกดปุ่มอื่นแล้วกลับมา
-                pcall(function()
-                    local closeBtn = LocalPlayer.PlayerGui.ScreenGui.CanvasGroup.ServerList.Close
-                    if closeBtn then
-                        virtualClick(closeBtn)
-                        task.wait(2)
-                        
-                        -- กดเปิด ServerList ใหม่
-                        local beadyBtn = LocalPlayer.PlayerGui.ScreenGui.CanvasGroup.Main.BeadyCity.Button
-                        if beadyBtn then
-                            virtualClick(beadyBtn)
-                            task.wait(2)
-                        end
-                    end
-                end)
-                
-                task.wait(3)
             end
         end
 
         if not found then
-            print("❌ ไม่เจอเซิฟเวอร์ว่างหลังค้นหา " .. maxAttempts .. " ครั้ง")
-            print("🔄 กำลัง Rejoin...")
             rejoinServer()
         end
     end)
@@ -837,6 +777,7 @@ task.spawn(function()
             if savedActivity == "fishing" and AutoFishingEnabled then
                 resumeFishing()
             elseif savedActivity == "grape" and AutoGrapeEnabled then
+
                 print("✅ กลับมาฟามองุ่นต่อ")
             end
         end
@@ -877,14 +818,14 @@ end)
 
 -- Auto Fishing Toggle
 local FishingToggle = Tabs.Main:AddToggle("AutoFishing", {
-    Title = "🎣 Auto Fishing",
+    Title = "Auto Fishing",
     Description = "ตกปลาอัตโนมัติ - ฟาม-ขาย-วนซ้ำ",
     Default = _G.CONFIG.AutoFishingOnStart,
     Callback = function(Value)
         AutoFishingEnabled = Value
         
         if Value then
-            currentActivity = "fishing"
+            currentActivity = "fishing"  -- ⬅️ เพิ่ม
             
             Fluent:Notify({
                 Title = "Auto Fishing",
@@ -932,6 +873,7 @@ local FishingToggle = Tabs.Main:AddToggle("AutoFishing", {
     end
 })
 
+
 local GrapeToggle = Tabs.Main:AddToggle("AutoGrape", {
     Title = "🍇 Auto Grape Farm",
     Description = "ฟามองุ่นอัตโนมัติ - ฟาม-แปรรูป-ขาย-วนซ้ำ",
@@ -940,7 +882,7 @@ local GrapeToggle = Tabs.Main:AddToggle("AutoGrape", {
         AutoGrapeEnabled = Value
         
         if Value then
-            currentActivity = "grape"
+            currentActivity = "grape"  -- ⬅️ เพิ่ม
             
             Fluent:Notify({
                 Title = "Auto Grape",
@@ -987,24 +929,6 @@ local GrapeToggle = Tabs.Main:AddToggle("AutoGrape", {
     end
 })
 
---========================================================
---                  INFO TAB                              
---========================================================
-
-Tabs.Info:AddParagraph({
-    Title = "📱 Mobile Support",
-    Content = "✅ รองรับการใช้งานบนมือถือ\n✅ Scroll ค้นหาเซิฟเวอร์อัตโนมัติ\n✅ หาเซิฟเวอร์ว่างจนกว่าจะเจอ"
-})
-
-Tabs.Info:AddParagraph({
-    Title = "🎣 Auto Fishing",
-    Content = "• ฟาร์มปลาจนน้ำหนักเต็ม\n• ซื้อเบ็ดอัตโนมัติเมื่อหมด\n• ขายปลาอัตโนมัติ"
-})
-
-Tabs.Info:AddParagraph({
-    Title = "🍇 Auto Grape",
-    Content = "• ฟาร์มองุ่น 30 ลูก\n• แปรรูปเป็น GrapePack\n• ขายเมื่อน้ำหนักเต็ม 60 KG"
-})
 
 --========================================================
 --                  FINAL SETUP                           
@@ -1041,11 +965,9 @@ end
 
 Fluent:Notify({
     Title = "✅ Auto Farm System Loaded!",
-    Content = "📱 รองรับมือถือ | 🔍 Auto Find Empty Server",
+    Content = "ทุกระบบพร้อมใช้งาน",
     Duration = 5
 })
 
 print("✅ Full Auto Farm System Loaded!")
-print("📱 Mobile Support: ENABLED")
-print("🔍 Auto Find Empty Server: ENABLED")
 print("📋 Config: Fishing=" .. tostring(_G.CONFIG.AutoFishingOnStart) .. " | Grape=" .. tostring(_G.CONFIG.AutoGrapeOnStart))
