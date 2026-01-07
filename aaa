@@ -39,10 +39,6 @@ while not checkRemotes() do
         local centerY = pos.Y + (size.Y / 2)
         
         if isMobile then
-            VirtualInputManager:SendTouchEvent(0, centerX, centerY)
-            task.wait(0.1)
-            VirtualInputManager:SendTouchEvent(2, centerX, centerY)
-
             VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
             task.wait(0.1)
             VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
