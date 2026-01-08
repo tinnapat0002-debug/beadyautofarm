@@ -45,7 +45,7 @@ local function createFishingPlatform()
         
         local part = Instance.new("Part")
         part.Name = "FishingPlatform"
-        part.CFrame = CFrame.new(-671, 20, -2950)
+        part.CFrame = CFrame.new(-671, 18, -2950)
         part.Anchored = true
         part.Size = Vector3.new(10, 2, 10)
         part.Transparency = 0.5
@@ -56,11 +56,34 @@ local function createFishingPlatform()
     end)
 end
 
+local function ensureFishingRod()
+    local hasRod = false
+    
+    pcall(function()
+        local playerName = player.Name
+        if workspace:FindFirstChild(playerName) and workspace[playerName]:FindFirstChild("FishingRod") then
+            hasRod = true
+            print("✅ Already has fishing rod")
+        end
+    end)
+    
+    if not hasRod then
+        print("⚠️ No fishing rod found - Equipping...")
+        pcall(function()
+            local args = {"FishingRod", "", ""}
+            game.Lighting:WaitForChild("Sky"):WaitForChild("Optimized"):FireServer(unpack(args))
+        end)
+        task.wait(1)
+        print("✅ Equipped fishing rod")
+    end
+end
+
 --========================================================
 --                  FISHING FUNCTIONS                     
 --========================================================
 
 local function toggleFishingRod()
+
     pcall(function()
         local args = {"FishingRod", "", ""}
         game.Lighting:WaitForChild("Sky"):WaitForChild("Optimized"):FireServer(unpack(args))
@@ -199,11 +222,10 @@ end
 
 local function startFishing()
     print("🎣 Starting fishing process...")
-    
-    -- Toggle rod
-    toggleFishingRod()
-    task.wait(2)
-    
+
+    ensureFishingRod()
+    task.wait(1)
+
     -- Teleport
     teleportToFishingSpot()
     task.wait(2)
@@ -222,9 +244,10 @@ end
 local function resumeFishing()
     print("🎣 Resuming fishing process...")
     
-    -- Toggle rod
-    toggleFishingRod()
-    task.wait(2)
+    -- เช็คและหยิบเบ็ดก่อน
+    ensureFishingRod()
+    task.wait(1)
+    
     
     -- Teleport
     teleportToFishingSpot()
@@ -491,7 +514,7 @@ end
 --                  BACKGROUND THREADS                    
 --========================================================
 
--- Anti-AFK System (เปลี่ยนเป็นกด Shift แทน)
+-- Anti-AFK System
 task.spawn(function()
     while true do
         task.wait(180) -- 3 นาที
@@ -499,7 +522,6 @@ task.spawn(function()
         pcall(function()
             local VirtualInputManager = game:GetService("VirtualInputManager")
             
-            -- กดปุ่ม LeftShift แทน
             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
             task.wait(0.1)
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
