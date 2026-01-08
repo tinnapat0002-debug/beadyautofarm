@@ -198,35 +198,47 @@ local function teleportToFishingSpot()
 end
 
 local function startFishing()
+    print("🎣 Starting fishing process...")
+    
+    -- Toggle rod
     toggleFishingRod()
-    task.wait(1)
+    task.wait(2)
     
+    -- Teleport
     teleportToFishingSpot()
+    task.wait(2)
     
-    for i = 1, 3 do
-        pcall(function()
-            ReplicatedStorage.Remote.Main:FireServer("AutoFishing")
-        end)
-    end
+    -- Fire AutoFishing remote ครั้งเดียว
+    print("🎣 Firing AutoFishing remote...")
+    pcall(function()
+        ReplicatedStorage.Remote.Main:FireServer("AutoFishing")
+        print("✅ Fired AutoFishing remote")
+    end)
     
     isFishing = true
-    print("🎣 Started fishing")
+    print("✅ Fishing started successfully!")
 end
 
 local function resumeFishing()
+    print("🎣 Resuming fishing process...")
+    
+    -- Toggle rod
     toggleFishingRod()
-    task.wait(1)
+    task.wait(2)
     
+    -- Teleport
     teleportToFishingSpot()
+    task.wait(2)
     
-    for i = 1, 3 do
-        pcall(function()
-            ReplicatedStorage.Remote.Main:FireServer("AutoFishing")
-        end)
-    end
+    -- Fire AutoFishing remote ครั้งเดียว
+    print("🎣 Firing AutoFishing remote...")
+    pcall(function()
+        ReplicatedStorage.Remote.Main:FireServer("AutoFishing")
+        print("✅ Fired AutoFishing remote")
+    end)
     
     isFishing = true
-    print("🎣 Resumed fishing")
+    print("✅ Fishing resumed successfully!")
 end
 
 local function sellSalmon()
@@ -479,7 +491,7 @@ end
 --                  BACKGROUND THREADS                    
 --========================================================
 
--- Anti-AFK System
+-- Anti-AFK System (เปลี่ยนเป็นกด Shift แทน)
 task.spawn(function()
     while true do
         task.wait(180) -- 3 นาที
@@ -487,11 +499,12 @@ task.spawn(function()
         pcall(function()
             local VirtualInputManager = game:GetService("VirtualInputManager")
             
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+            -- กดปุ่ม LeftShift แทน
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
             task.wait(0.1)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
             
-            print("⏰ Anti-AFK triggered")
+            print("⏰ Anti-AFK triggered (Shift)")
         end)
     end
 end)
@@ -645,7 +658,7 @@ Tabs.Info:AddParagraph({
 
 Tabs.Info:AddParagraph({
     Title = "✨ Features",
-    Content = "• 🎣 Auto Fishing\n• 💰 Auto Sell Fish\n• 🍔 Auto Buy & Eat Food (Loop)\n• 🎯 Auto Buy Bait\n• ⏰ Anti-AFK"
+    Content = "• 🎣 Auto Fishing\n• 💰 Auto Sell Fish\n• 🍔 Auto Buy & Eat Food (Loop)\n• 🎯 Auto Buy Bait\n• ⏰ Anti-AFK (Shift Key)"
 })
 
 --========================================================
@@ -670,4 +683,4 @@ print("  🎣 Auto Fishing")
 print("  💰 Auto Sell")
 print("  🍔 Auto Food (loop until >50)")
 print("  🎯 Auto Buy Bait")
-print("  ⏰ Anti-AFK")
+print("  ⏰ Anti-AFK (Shift)")
