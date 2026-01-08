@@ -218,6 +218,7 @@ local function teleportToFishingSpot()
     
     isTeleporting = false
     print("✅ Teleported to fishing spot")
+    task.wait(2)
 end
 
 local function startFishing()
