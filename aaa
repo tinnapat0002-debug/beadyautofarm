@@ -205,7 +205,7 @@ local function teleportToFishingSpot()
     
     task.wait(0.5)
     
-    local pos = CFrame.new(-671, 15, -2950)
+    local pos = CFrame.new(-671, 18, -2950)
     
     for i = 1, 3 do
         pcall(function()
