@@ -1,19 +1,12 @@
-_G.CONFIG = {
-    AutoFishingOnStart = true,
-    AutoGrapeOnStart = false
-}
-
 --========================================================
 --              FLUENT UI AUTO FARM SYSTEM               
 --========================================================
 
--- Load Fluent UI
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
--- สร้าง Window
 local Window = Fluent:CreateWindow({
-    Title = "Auto Farm System",
-    SubTitle = "Full Auto Script",
+    Title = "Smart Auto Farm System",
+    SubTitle = "Grape & Fishing Farm",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
@@ -21,20 +14,17 @@ local Window = Fluent:CreateWindow({
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
--- สร้าง Tabs
 local Tabs = {
     Main = Window:AddTab({ Title = "🏠 Main", Icon = "home" }),
     Info = Window:AddTab({ Title = "ℹ️ Info", Icon = "info" })
 }
 
--- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
 -- Global Variables
-local AutoFishingEnabled = _G.CONFIG.AutoFishingOnStart
-local AutoGrapeEnabled = _G.CONFIG.AutoGrapeOnStart
+local AutoFarmEnabled = _G.CONFIG.AutoFarmOnStart
 
 local isFishing = false
 local isSelling = false
@@ -43,7 +33,67 @@ local isBuyingBait = false
 local isFarming = false
 local isProcessing = false
 local isBuyingFood = false
-local currentActivity = nil
+local currentActivity = "grape" -- เริ่มจาก "grape"
+local shouldStopGrapeFarm = false
+
+local GRAPE_FARM_POSITION = Vector3.new(5334, 477, 2737)
+local PLAYER_DETECTION_RANGE = 500
+
+--========================================================
+--                  HELPER FUNCTIONS                     
+--========================================================
+
+local function createFishingPlatform()
+    pcall(function()
+        local oldPart = workspace:FindFirstChild("FishingPlatform")
+        if oldPart then
+            oldPart:Destroy()
+        end
+        
+        local part = Instance.new("Part")
+        part.Name = "FishingPlatform"
+        part.CFrame = CFrame.new(-671, 20, -2950)
+        part.Anchored = true
+        part.Size = Vector3.new(10, 2, 10)
+        part.Transparency = 0.5
+        part.CanCollide = true
+        part.Parent = workspace
+        
+        print("✅ Created fishing platform")
+    end)
+end
+
+local function checkNearbyPlayers()
+    local nearbyPlayers = {}
+    
+    pcall(function()
+        local myChar = player.Character
+        if not myChar then return end
+        
+        local myHrp = myChar:FindFirstChild("HumanoidRootPart")
+        if not myHrp then return end
+        
+        for _, otherPlayer in ipairs(Players:GetPlayers()) do
+            if otherPlayer ~= player then
+                local otherChar = otherPlayer.Character
+                if otherChar then
+                    local otherHrp = otherChar:FindFirstChild("HumanoidRootPart")
+                    if otherHrp then
+                        local distance = (myHrp.Position - otherHrp.Position).Magnitude
+                        if distance <= PLAYER_DETECTION_RANGE then
+                            table.insert(nearbyPlayers, {
+                                player = otherPlayer,
+                                distance = distance
+                            })
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    
+    return nearbyPlayers
+end
 
 --========================================================
 --                  FISHING FUNCTIONS                     
@@ -167,18 +217,23 @@ local function teleportToFishingSpot()
     
     isTeleporting = true
     
-    local FISHING_POSITION = Vector3.new(-671, 32, -2950)
+    createFishingPlatform()
     
-    for i = 1, 5 do
+    task.wait(0.5)
+    
+    local pos = CFrame.new(-671, 25, -2950)
+    
+    for i = 1, 3 do
         pcall(function()
             local character = player.Character or player.CharacterAdded:Wait()
             local hrp = character:WaitForChild("HumanoidRootPart")
-            hrp.CFrame = CFrame.new(FISHING_POSITION)
+            hrp.CFrame = pos
         end)
-        task.wait(3)
+        task.wait(2)
     end
     
     isTeleporting = false
+    print("✅ Teleported to fishing spot")
 end
 
 local function startFishing()
@@ -194,6 +249,8 @@ local function startFishing()
     end
     
     isFishing = true
+    currentActivity = "fishing"
+    print("🎣 Started fishing")
 end
 
 local function resumeFishing()
@@ -209,6 +266,8 @@ local function resumeFishing()
     end
     
     isFishing = true
+    currentActivity = "fishing"
+    print("🎣 Resumed fishing")
 end
 
 local function sellSalmon()
@@ -307,6 +366,7 @@ local function sellAllFish()
     
     task.wait(1)
     isSelling = false
+    print("💰 Finished selling fish")
 end
 
 --========================================================
@@ -416,6 +476,7 @@ local function sellGrapePack()
     
     task.wait(1)
     isSelling = false
+    print("💰 Finished selling grape pack")
 end
 
 local function processGrapes()
@@ -427,12 +488,10 @@ local function processGrapes()
     
     task.wait(1)
     
-    local PROCESS_POS = Vector3.new(5334, 477, 2737)
-    
     for i = 1, 3 do
         pcall(function()
             if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                player.Character.HumanoidRootPart.CFrame = CFrame.new(PROCESS_POS)
+                player.Character.HumanoidRootPart.CFrame = CFrame.new(GRAPE_FARM_POSITION)
             end
         end)
         task.wait(2)
@@ -458,6 +517,7 @@ local function processGrapes()
     
     task.wait(20)
     isProcessing = false
+    print("✅ Finished processing grapes")
 end
 
 local function startGrapeFarm()
@@ -465,8 +525,27 @@ local function startGrapeFarm()
         task.wait(1)
     end
     
+    -- เช็คคนก่อนเริ่มฟาร์ม
+    local nearbyPlayers = checkNearbyPlayers()
+    if #nearbyPlayers > 0 then
+        print("⚠️ Players detected near grape farm! Going to fishing instead...")
+        print("Players nearby:")
+        for _, data in ipairs(nearbyPlayers) do
+            print("  - " .. data.player.Name .. " (" .. math.floor(data.distance) .. " studs)")
+        end
+        return false
+    end
+    
+    -- เช็คน้ำหนัก
+    local currentWeight = getCurrentWeight()
+    if currentWeight and currentWeight >= 60 then
+        print("⚠️ Weight limit reached! Going to fishing instead...")
+        return false
+    end
+    
     isTeleporting = true
     isFarming = true
+    shouldStopGrapeFarm = false
     
     local targetGrape = getAnyGrape()
     
@@ -474,7 +553,7 @@ local function startGrapeFarm()
         task.wait(10)
         isTeleporting = false
         isFarming = false
-        return
+        return false
     end
     
     local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -489,17 +568,48 @@ local function startGrapeFarm()
         end)
         
         isTeleporting = false
+        currentActivity = "grape"
+        print("🍇 Started grape farming")
         
-        repeat
-            task.wait(5)
-        until getGrapeAmount() >= 30
+        -- ฟาร์มองุ่นพร้อมเช็คผู้เล่นตลอดเวลา
+        while getGrapeAmount() < 30 do
+            task.wait(2)
+            
+            if shouldStopGrapeFarm then
+                print("⚠️ Stopping grape farm - player detected!")
+                pcall(function()
+                    ReplicatedStorage.Remotes.Farm:FireServer("Stop")
+                end)
+                isFarming = false
+                return false
+            end
+            
+            local nearbyPlayers = checkNearbyPlayers()
+            if #nearbyPlayers > 0 then
+                print("⚠️ Player detected within 500 studs! Switching to fishing...")
+                print("Players nearby:")
+                for _, data in ipairs(nearbyPlayers) do
+                    print("  - " .. data.player.Name .. " (" .. math.floor(data.distance) .. " studs)")
+                end
+                
+                pcall(function()
+                    ReplicatedStorage.Remotes.Farm:FireServer("Stop")
+                end)
+                
+                isFarming = false
+                shouldStopGrapeFarm = true
+                return false
+            end
+        end
     end
     
     isFarming = false
+    print("✅ Grape farming complete (30 grapes)")
+    return true
 end
 
 --========================================================
---                  FOOD SYSTEM                           
+--                  FOOD SYSTEM (เช็คซ้ำจนกว่าจะเต็ม)      
 --========================================================
 
 local function getHunger()
@@ -523,6 +633,7 @@ local function buyAndEatFood()
     
     local SHOP_POSITION = Vector3.new(284, 66, -956)
     
+    -- Teleport to shop
     for i = 1, 3 do
         pcall(function()
             local character = player.Character or player.CharacterAdded:Wait()
@@ -534,6 +645,7 @@ local function buyAndEatFood()
     
     task.wait(1.5)
 
+    -- Fire proximity prompt
     pcall(function()
         local character = player.Character
         local hrp = character and character:FindFirstChild("HumanoidRootPart")
@@ -564,6 +676,7 @@ local function buyAndEatFood()
     
     task.wait(2)
     
+    -- Buy Snack bar
     pcall(function()
         local args = {
             "Money",
@@ -579,6 +692,7 @@ local function buyAndEatFood()
     
     task.wait(1)
     
+    -- Buy Cotton candy
     pcall(function()
         local args = {
             "Money",
@@ -594,6 +708,7 @@ local function buyAndEatFood()
     
     task.wait(1)
     
+    -- Close shop
     pcall(function()
         local args = {"Close"}
         player.PlayerGui.Shop.LocalScript.RemoteEvent:FireServer(unpack(args))
@@ -601,6 +716,7 @@ local function buyAndEatFood()
     
     task.wait(2)
     
+    -- Eat Cotton candy
     pcall(function()
         local args = {"Hunger", 0, "Cotton candy"}
         game.Lighting:WaitForChild("Sky"):WaitForChild("Optimized"):FireServer(unpack(args))
@@ -608,6 +724,7 @@ local function buyAndEatFood()
     
     task.wait(20)
     
+    -- Eat Snack bar
     pcall(function()
         local args = {"Hunger", 10, "Snack bar"}
         game.Lighting:WaitForChild("Sky"):WaitForChild("Optimized"):FireServer(unpack(args))
@@ -618,16 +735,104 @@ local function buyAndEatFood()
     isBuyingFood = false
 end
 
+local function ensureFullHungerBrain()
+    print("🍔 Checking hunger/brain status...")
+    
+    while true do
+        local hunger = getHunger()
+        local brain = getBrain()
+        
+        print("📊 Current status: Hunger=" .. hunger .. ", Brain=" .. brain)
+        
+        if hunger > 50 and brain > 50 then
+            print("✅ Hunger and Brain are sufficient!")
+            break
+        else
+            print("⚠️ Need more food! Hunger=" .. hunger .. ", Brain=" .. brain)
+            print("🛒 Buying and eating food...")
+            
+            buyAndEatFood()
+            
+            task.wait(3)
+            
+            print("🔄 Rechecking hunger/brain status...")
+        end
+    end
+    
+    print("✅ Food check complete - returning to farm")
+end
+
 --========================================================
 --                  BACKGROUND THREADS                    
 --========================================================
+
+-- Anti-AFK System
+task.spawn(function()
+    while true do
+        task.wait(180) -- 3 นาที
+        
+        pcall(function()
+            local VirtualInputManager = game:GetService("VirtualInputManager")
+            
+            -- กดปุ่ม W เบาๆ
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+            
+            print("⏰ Anti-AFK triggered")
+        end)
+    end
+end)
+
+-- Player detection thread (ส่ง Remote Stop แบบถูกต้อง)
+task.spawn(function()
+    while true do
+        task.wait(1) -- เช็คทุก 1 วินาที
+        
+        if not AutoFarmEnabled then
+            continue
+        end
+        
+        -- เช็คว่ามีคนใกล้หรือไม่
+        local nearbyPlayers = checkNearbyPlayers()
+        
+        if #nearbyPlayers > 0 then
+            print("👥 Found " .. #nearbyPlayers .. " players nearby!")
+            
+            for _, data in ipairs(nearbyPlayers) do
+                print("  - " .. data.player.Name .. " (" .. math.floor(data.distance) .. " studs)")
+            end
+            
+            -- ถ้ากำลังฟาร์มองุ่นอยู่
+            if isFarming and currentActivity == "grape" then
+                print("⚠️ STOPPING GRAPE FARM NOW!")
+                
+                shouldStopGrapeFarm = true
+                isFarming = false
+                
+                -- ส่ง Remote หยุดฟาร์ม
+                pcall(function()
+                    local ohString1 = "Stop"
+                    game:GetService("ReplicatedStorage").Remotes.Farm:FireServer(ohString1)
+                    print("✅ Sent Stop signal to server")
+                end)
+                
+                task.wait(5)
+                
+                -- ไปตกปลาทันที
+                print("🎣 SWITCHING TO FISHING NOW...")
+                startFishing()
+            end
+        end
+    end
+end)
 
 -- Check hunger and brain
 task.spawn(function()
     while true do
         task.wait(30)
         
-        if isBuyingFood or isSelling or isTeleporting then
+        if not AutoFarmEnabled or isBuyingFood or isSelling or isTeleporting then
             continue
         end
         
@@ -635,31 +840,74 @@ task.spawn(function()
         local brain = getBrain()
         
         if hunger <= 50 or brain <= 50 then
+            print("⚠️ Low hunger/brain detected! Hunger=" .. hunger .. ", Brain=" .. brain)
+            
             local wasFishing = isFishing
             local savedActivity = currentActivity
 
             if isFishing then
                 toggleFishingRod()
+                isFishing = false
                 task.wait(1)
             end
             
-            buyAndEatFood()
+            if isFarming then
+                pcall(function()
+                    ReplicatedStorage.Remotes.Farm:FireServer("Stop")
+                end)
+                isFarming = false
+                task.wait(1)
+            end
+            
+            ensureFullHungerBrain()
 
-            if savedActivity == "fishing" and AutoFishingEnabled then
-                resumeFishing()
-            elseif savedActivity == "grape" and AutoGrapeEnabled then
-                print("✅ กลับมาฟามองุ่นต่อ")
+            if AutoFarmEnabled then
+                if savedActivity == "fishing" then
+                    print("🎣 Returning to fishing")
+                    resumeFishing()
+                elseif savedActivity == "grape" then
+                    print("🍇 Ready to return to grape farm")
+                    shouldStopGrapeFarm = false
+                    
+                    -- เช็คว่ามีคนใกล้ไหมก่อนกลับไปฟาร์ม
+                    local nearbyPlayers = checkNearbyPlayers()
+                    if #nearbyPlayers == 0 then
+                        -- ไม่มีคน → วาปกลับไปฟาร์มองุ่น
+                        local targetGrape = getAnyGrape()
+                        if targetGrape then
+                            pcall(function()
+                                local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                                if hrp then
+                                    local targetPos = targetGrape:IsA("Model") and targetGrape:GetModelCFrame() or targetGrape.CFrame
+                                    hrp.CFrame = targetPos * CFrame.new(0, 2, 0)
+                                    task.wait(1)
+                                    
+                                    -- เริ่มฟาร์มใหม่
+                                    ReplicatedStorage.Remote.Main:FireServer("FarmItemGame")
+                                    isFarming = true
+                                    currentActivity = "grape"
+                                    print("✅ Resumed grape farming")
+                                end
+                            end)
+                        end
+                    else
+                        -- มีคน → ไปตกปลาแทน
+                        print("⚠️ Players still nearby, going to fishing")
+                        shouldStopGrapeFarm = true
+                        startFishing()
+                    end
+                end
             end
         end
     end
 end)
 
--- Check bait (for fishing)
+-- Check bait
 task.spawn(function()
     while true do
         task.wait(10)
         
-        if not AutoFishingEnabled or isBuyingBait or isSelling or isTeleporting or isBuyingFood then
+        if not AutoFarmEnabled or currentActivity ~= "fishing" or isBuyingBait or isSelling or isTeleporting or isBuyingFood then
             continue
         end
         
@@ -674,7 +922,7 @@ task.spawn(function()
             
             buyBait()
             
-            if AutoFishingEnabled then
+            if AutoFarmEnabled then
                 task.wait(2)
                 resumeFishing()
             end
@@ -682,161 +930,155 @@ task.spawn(function()
     end
 end)
 
+
 --========================================================
 --                  MAIN TAB                              
 --========================================================
 
--- Auto Fishing Toggle
-local FishingToggle = Tabs.Main:AddToggle("AutoFishing", {
-    Title = "🎣 Auto Fishing",
-    Description = "ตกปลาอัตโนมัติ - ฟาม-ขาย-วนซ้ำ",
-    Default = _G.CONFIG.AutoFishingOnStart,
+Tabs.Main:AddParagraph({
+    Title = "🎯 Smart Auto Farm",
+    Content = "ระบบฟาร์มอัจฉริยะ\n• เริ่มจากฟาร์มองุ่น (เช็ค player)\n• ถ้ามี player → ไปตกปลา\n• ตกปลาจนน้ำหนัก 50 → ขาย\n• กลับมาฟาร์มองุ่น (วนซ้ำ)"
+})
+
+local AutoFarmToggle = Tabs.Main:AddToggle("AutoFarm", {
+    Title = "🚀 Auto Farm",
+    Description = "เปิดระบบฟาร์มอัตโนมัติ (องุ่น → ตกปลา → วนซ้ำ)",
+    Default = _G.CONFIG.AutoFarmOnStart,
     Callback = function(Value)
-        AutoFishingEnabled = Value
+        AutoFarmEnabled = Value
         
         if Value then
-            currentActivity = "fishing"
-            
             Fluent:Notify({
-                Title = "Auto Fishing",
-                Content = "เปิดใช้งานระบบตกปลาอัตโนมัติ",
+                Title = "Auto Farm",
+                Content = "เริ่มระบบฟาร์มอัตโนมัติ",
                 Duration = 3
             })
             
             task.spawn(function()
-                while AutoFishingEnabled do
-                    startFishing()
+                while AutoFarmEnabled do
+                    -- Phase 1: Try Grape Farm first
+                    print("📍 Phase 1: Attempting Grape Farm")
                     
-                    while AutoFishingEnabled do
+                    local grapeFarmSuccess = startGrapeFarm()
+                    
+                    if grapeFarmSuccess then
+                        -- Process grapes
+                        print("📍 Phase 2: Processing grapes")
+                        processGrapes()
                         task.wait(2)
                         
-                        if isSelling or isTeleporting or isBuyingBait or isBuyingFood then
-                            continue
-                        end
+                        -- Sell grape pack
+                        print("📍 Phase 3: Selling grape pack")
+                        sellGrapePack()
+                        task.wait(3)
                         
-                        local currentWeight = getCurrentWeight()
+                        print("🔄 Cycle complete - Trying grape farm again")
+                    else
+                        -- If grape farm failed, go fishing
+                        print("📍 Phase 4: Grape farm failed - Going to fishing")
+                        startFishing()
                         
-                        if currentWeight and currentWeight >= 50 then
-                            toggleFishingRod()
-                            isFishing = false
+                        while AutoFarmEnabled do
                             task.wait(2)
-                            sellAllFish()
-                            task.wait(3)
-                            break
+                            
+                            if isSelling or isTeleporting or isBuyingBait or isBuyingFood then
+                                continue
+                            end
+                            
+                            local currentWeight = getCurrentWeight()
+                            
+                            if currentWeight and currentWeight >= 50 then
+                                print("⚠️ Weight limit reached: " .. currentWeight .. " KG")
+                                
+                                if isFishing then
+                                    toggleFishingRod()
+                                    isFishing = false
+                                    task.wait(2)
+                                end
+                                
+                                -- Phase 5: Sell fish
+                                print("📍 Phase 5: Selling fish")
+                                sellAllFish()
+                                task.wait(3)
+                                
+                                break
+                            end
                         end
+                        
+                        print("🔄 Fishing complete - Returning to grape farm")
                     end
+                    
+                    if not AutoFarmEnabled then break end
+                    task.wait(2)
                 end
-                currentActivity = nil
             end)
         else
-            currentActivity = nil
             Fluent:Notify({
-                Title = "Auto Fishing",
-                Content = "ปิดใช้งานระบบตกปลาอัตโนมัติ",
+                Title = "Auto Farm",
+                Content = "หยุดระบบฟาร์มอัตโนมัติ",
                 Duration = 3
             })
+            
             if isFishing then
                 toggleFishingRod()
                 isFishing = false
             end
+            
+            if isFarming then
+                pcall(function()
+                    ReplicatedStorage.Remotes.Farm:FireServer("Stop")
+                end)
+                isFarming = false
+            end
+            
+            shouldStopGrapeFarm = true
         end
     end
 })
 
--- Auto Grape Toggle
-local GrapeToggle = Tabs.Main:AddToggle("AutoGrape", {
-    Title = "🍇 Auto Grape Farm",
-    Description = "ฟามองุ่นอัตโนมัติ - ฟาม-แปรรูป-ขาย-วนซ้ำ",
-    Default = _G.CONFIG.AutoGrapeOnStart,
-    Callback = function(Value)
-        AutoGrapeEnabled = Value
-        
-        if Value then
-            currentActivity = "grape"
-            
-            Fluent:Notify({
-                Title = "Auto Grape",
-                Content = "เปิดใช้งานระบบฟามองุ่นอัตโนมัติ",
-                Duration = 3
-            })
-            
-            task.spawn(function()
-                while AutoGrapeEnabled do
-                    while AutoGrapeEnabled do
-                        if isSelling or isTeleporting or isBuyingFood then
-                            task.wait(1)
-                            continue
-                        end
-                        
-                        local currentWeight = getCurrentWeight()
-                        
-                        if currentWeight and currentWeight >= 60 then
-                            print("⚠️ น้ำหนักเต็ม: " .. currentWeight .. " KG")
-                            break
-                        end
-                        
-                        startGrapeFarm()
-                        processGrapes()
-                        task.wait(2)
-                    end
-                    
-                    if AutoGrapeEnabled then
-                        print("💰 กำลังไปขาย GrapePack...")
-                        sellGrapePack()
-                        task.wait(3)
-                    end
-                end
-                currentActivity = nil
-            end)
-        else
-            currentActivity = nil 
-            Fluent:Notify({
-                Title = "Auto Grape",
-                Content = "ปิดใช้งานระบบฟามองุ่นอัตโนมัติ",
-                Duration = 3
-            })
-        end
-    end
+--========================================================
+--                  INFO TAB                              
+--========================================================
+
+Tabs.Info:AddParagraph({
+    Title = "📖 How It Works",
+    Content = "1️⃣ เริ่มจากฟาร์มองุ่น (เช็ค player)\n2️⃣ ถ้าไม่มีคน → ฟาร์มองุ่น → แปรรูป → ขาย\n3️⃣ ถ้ามีคนหรือน้ำหนักเต็ม → ตกปลา\n4️⃣ ตกปลาจนเต็ม 50 KG → ขาย\n5️⃣ กลับไปฟาร์มองุ่น (วนซ้ำ)"
+})
+
+Tabs.Info:AddParagraph({
+    Title = "🍔 Smart Food System",
+    Content = "• เช็ค Hunger/Brain ทุก 30 วินาที\n• ถ้าต่ำกว่า 50 → ซื้อและกิน\n• เช็คซ้ำจนกว่าจะ > 50\n• กลับไปฟาร์มต่อโดยอัตโนมัติ"
+})
+
+Tabs.Info:AddParagraph({
+    Title = "🛡️ Player Detection",
+    Content = "• ตรวจจับผู้เล่นอื่นในระยะ 500 studs\n• เช็คก่อนเริ่มฟาร์มองุ่น\n• เช็คตลอดเวลาระหว่างฟาร์ม\n• มีคนเข้ามาใกล้ → ไปตกปลาแทน"
+})
+
+Tabs.Info:AddParagraph({
+    Title = "✨ Features",
+    Content = "• 🍇 Smart Grape Farm (Priority)\n• 🎣 Auto Fishing (Backup)\n• 💰 Auto Sell\n• 🍔 Auto Buy & Eat Food (Loop)\n• 🎯 Auto Buy Bait\n• 👥 Player Detection (500 studs)"
 })
 
 --========================================================
 --                  FINAL SETUP                           
 --========================================================
 
-if _G.CONFIG.AutoFishingOnStart then
+if _G.CONFIG.AutoFarmOnStart then
     task.wait(2)
-    print("🎣 [CONFIG] เปิด Auto Fishing อัตโนมัติ")
-    FishingToggle:SetValue(true)
-end
-
-if _G.CONFIG.AutoGrapeOnStart then
-    task.wait(2)
-    print("🍇 [CONFIG] เปิด Auto Grape อัตโนมัติ")
-    GrapeToggle:SetValue(true)
-end
-
--- Notification
-local configMsg = ""
-if _G.CONFIG.AutoFishingOnStart then
-    configMsg = configMsg .. "🎣 Auto Fishing "
-end
-if _G.CONFIG.AutoGrapeOnStart then
-    configMsg = configMsg .. "🍇 Auto Grape "
-end
-
-if configMsg ~= "" then
-    Fluent:Notify({
-        Title = "✅ Auto Start Enabled",
-        Content = "เปิดอัตโนมัติ: " .. configMsg,
-        Duration = 5
-    })
+    print("🚀 [CONFIG] Auto starting farm system")
+    AutoFarmToggle:SetValue(true)
 end
 
 Fluent:Notify({
-    Title = "✅ Auto Farm System Loaded!",
-    Content = "ทุกระบบพร้อมใช้งาน",
+    Title = "✅ Smart Auto Farm Loaded!",
+    Content = "ระบบฟาร์มอัจฉริยะพร้อมใช้งาน",
     Duration = 5
 })
 
-print("✅ Full Auto Farm System Loaded!")
-print("📋 Config: Fishing=" .. tostring(_G.CONFIG.AutoFishingOnStart) .. " | Grape=" .. tostring(_G.CONFIG.AutoGrapeOnStart))
+print("✅ Smart Auto Farm System Loaded!")
+print("📋 Priority:")
+print("  1️⃣ Grape Farm (check players)")
+print("  2️⃣ Fishing (if grape unavailable)")
+print("  3️⃣ Auto Food (loop until >50)")
+print("  4️⃣ Player Detection (500 studs)")
